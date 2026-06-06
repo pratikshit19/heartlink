@@ -38,6 +38,9 @@ struct WebView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         
+        // Store a weak reference to the webView in the coordinator
+        context.coordinator.webViewRef = webView
+        
         // Request notification permissions once app starts loading
         notificationManager.requestPermissions()
         
@@ -54,7 +57,7 @@ struct WebView: UIViewRepresentable {
             notificationManager.activeDeepLink = nil // Consume the deep link
             
             var baseURLString = url.absoluteString
-            if baseURLString.endsWith("/") {
+            if baseURLString.hasSuffix("/") {
                 baseURLString.removeLast()
             }
             
@@ -69,6 +72,8 @@ struct WebView: UIViewRepresentable {
     
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: WebView
+        // Weak reference to avoid retain cycle between WKWebView -> coordinator -> WKWebView
+        weak var webViewRef: WKWebView?
         
         init(_ parent: WebView) {
             self.parent = parent
@@ -91,8 +96,9 @@ struct WebView: UIViewRepresentable {
         ) {
             if message.name == "registerPushToken" {
                 print("[WebView] Received JS message 'registerPushToken'")
-                if let token = parent.notificationManager.deviceToken {
-                    sendTokenToWebpage(webView: webView!, token: token)
+                if let token = parent.notificationManager.deviceToken,
+                   let webView = webViewRef {
+                    sendTokenToWebpage(webView: webView, token: token)
                 } else {
                     // Try to request permissions/token if not present
                     parent.notificationManager.requestPermissions()
@@ -110,38 +116,5 @@ struct WebView: UIViewRepresentable {
                 }
             }
         }
-        
-        private var webView: WKWebView? {
-            // Helper to get webView reference inside the script handler
-            for windowScene in UIApplication.shared.connectedScenes {
-                if let windowScene = windowScene as? UIWindowScene {
-                    for window in windowScene.windows {
-                        if let rootVC = window.rootViewController {
-                            return findWebView(in: rootVC.view)
-                        }
-                    }
-                }
-            }
-            return nil
-        }
-        
-        private func findWebView(in view: UIView) -> WKWebView? {
-            if let webView = view as? WKWebView {
-                return webView
-            }
-            for subview in view.subviews {
-                if let found = findWebView(in: subview) {
-                    return found
-                }
-            }
-            return nil
-        }
-    }
-}
-
-// Helper utility extension
-extension String {
-    func endsWith(_ suffix: String) -> Bool {
-        return self.hasSuffix(suffix)
     }
 }

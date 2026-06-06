@@ -1,6 +1,8 @@
 name: HeartLink
 options:
   bundleIdPrefix: com.yourname
+  deploymentTarget:
+    iOS: "16.0"
 targets:
   HeartLink:
     type: application
@@ -15,6 +17,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.heartlink
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
     dependencies:
       - target: HeartLinkWidget
 
@@ -31,3 +35,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.heartlink.HeartLinkWidget
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: "NO"

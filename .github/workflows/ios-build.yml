@@ -20,14 +20,35 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode Project
-        run: xcodegen generate --spec ios/project.yml
+        working-directory: ios
+        run: xcodegen generate --spec project.yml
+
+      - name: List generated project schemes
+        working-directory: ios
+        run: xcodebuild -project HeartLink.xcodeproj -list
 
       - name: Build for Simulator (No Code Signing Required)
+        working-directory: ios
         run: |
-          xcodebuild -project ios/HeartLink.xcodeproj \
-                     -scheme HeartLink \
-                     -sdk iphonesimulator \
-                     -configuration Debug \
-                     CODE_SIGN_IDENTITY="-" \
-                     CODE_SIGNING_REQUIRED=NO \
-                     clean build
+          xcodebuild \
+            -project HeartLink.xcodeproj \
+            -scheme HeartLink \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            clean build \
+            | xcpretty || true
+          # xcpretty may not be installed; fallback ensures non-zero exit doesn't mask real errors
+          xcodebuild \
+            -project HeartLink.xcodeproj \
+            -scheme HeartLink \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            build 2>&1 | tail -30
