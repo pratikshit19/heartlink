@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build & Verify iOS App
-    runs-on: macos-14 # macOS 14 runner includes Xcode 15+ pre-installed
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
