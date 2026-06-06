@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerAuthRoutes } from "./auth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -35,7 +35,7 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
-  registerOAuthRoutes(app);
+  registerAuthRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",
@@ -45,13 +45,17 @@ async function startServer() {
     })
   );
 
-  // Periodic scheduled heartbeat
+  // Periodic scheduled heartbeat — secured by CRON_SECRET env var
   app.post("/api/scheduled/heartbeat", async (req, res) => {
     try {
-      const { sdk } = await import("./sdk");
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron) {
-        return res.status(403).json({ error: "Unauthorized: Cron execution only" });
+      const cronSecret = process.env.CRON_SECRET;
+      const authHeader = req.headers.authorization ?? "";
+      const providedSecret = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
+
+      if (!cronSecret || providedSecret !== cronSecret) {
+        return res.status(403).json({ error: "Unauthorized: Invalid cron secret" });
       }
 
       const { heartbeatJob } = await import("./heartbeat");
