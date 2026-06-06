@@ -1,0 +1,31 @@
+name: Build iOS App (Cloud Build)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Verify iOS App
+    runs-on: macos-14 # macOS 14 runner includes Xcode 15+ pre-installed
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate --spec ios/project.yml
+
+      - name: Build for Simulator (No Code Signing Required)
+        run: |
+          xcodebuild -project ios/HeartLink.xcodeproj \
+                     -scheme HeartLink \
+                     -sdk iphonesimulator \
+                     -configuration Debug \
+                     clean build

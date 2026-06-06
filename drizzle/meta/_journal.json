@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1780764768959,
+      "tag": "0000_curved_shatterstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1780770045141,
+      "tag": "0001_high_loki",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1780772668560,
+      "tag": "0002_normal_expediter",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+name: HeartLink
+options:
+  bundleIdPrefix: com.yourname
+targets:
+  HeartLink:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: HeartLink
+    settings:
+      base:
+        INFOPLIST_FILE: HeartLink/Info.plist
+        CODE_SIGN_ENTITLEMENTS: HeartLink/HeartLink.entitlements
+        DEVELOPMENT_TEAM: "" # Fill this with your Apple Developer Team ID
+    dependencies:
+      - target: HeartLinkWidget
+
+  HeartLinkWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: HeartLinkWidget
+    settings:
+      base:
+        INFOPLIST_FILE: HeartLinkWidget/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.yourname.heartlink.widget
