@@ -12,6 +12,7 @@ targets:
       base:
         INFOPLIST_FILE: HeartLink/Info.plist
         CODE_SIGN_ENTITLEMENTS: HeartLink/HeartLink.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.yourname.heartlink
         DEVELOPMENT_TEAM: "" # Fill this with your Apple Developer Team ID
     dependencies:
       - target: HeartLinkWidget
@@ -25,4 +26,4 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: HeartLinkWidget/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.yourname.heartlink.widget
+        PRODUCT_BUNDLE_IDENTIFIER: com.yourname.heartlink.HeartLinkWidget
