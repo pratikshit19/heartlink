@@ -1,0 +1,269 @@
+workflows:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. SIMULATOR BUILD — no Apple account needed, runs on every push
+  # ─────────────────────────────────────────────────────────────────────────────
+  ios-simulator-build:
+    name: iOS Simulator Build (No Signing)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    environment:
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
+      - name: Generate Xcode project
+        script: |
+          cd ios
+          xcodegen generate --spec project.yml
+
+      - name: Build for iPhone Simulator
+        script: |
+          cd ios
+          xcodebuild \
+            -project HeartLink.xcodeproj \
+            -scheme HeartLink \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            clean build \
+            | xcpretty --color
+
+    artifacts:
+      - ios/build/**/*.app
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. AD HOC BUILD — install directly on your iPhone via a link
+  #    Requires secrets: CERTIFICATE_PRIVATE_KEY, CERTIFICATE_P12,
+  #                      PROVISIONING_PROFILE, APP_STORE_CONNECT_KEY_IDENTIFIER,
+  #                      APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY
+  # ─────────────────────────────────────────────────────────────────────────────
+  ios-ad-hoc:
+    name: iOS Ad Hoc Build (Install on Device)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    # Only trigger manually from the Codemagic dashboard
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "adhoc-*"
+          include: true
+
+    environment:
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.yourname.heartlink
+      vars:
+        BUNDLE_ID: com.yourname.heartlink
+        BUNDLE_ID_WIDGET: com.yourname.heartlink.HeartLinkWidget
+        XCODE_PROJECT: ios/HeartLink.xcodeproj
+        XCODE_SCHEME: HeartLink
+      # Store these in Codemagic → App Settings → Environment variables (encrypted)
+      groups:
+        - apple_credentials     # APPLE_ID, APP_SPECIFIC_PASSWORD (optional for TestFlight)
+
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
+      - name: Generate Xcode project
+        script: |
+          cd ios
+          xcodegen generate --spec project.yml
+
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID" \
+            --type IOS_APP_ADHOC \
+            --create
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID_WIDGET" \
+            --type IOS_APP_ADHOC \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build Ad Hoc IPA
+        script: |
+          cd ios
+          xcodebuild \
+            -project HeartLink.xcodeproj \
+            -scheme HeartLink \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$CM_BUILD_DIR/HeartLink.xcarchive" \
+            archive \
+            | xcpretty --color
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$CM_BUILD_DIR/HeartLink.xcarchive" \
+            -exportOptionsPlist /tmp/export_options.plist \
+            -exportPath "$CM_BUILD_DIR/output" \
+            | xcpretty --color
+
+      - name: Generate export options plist
+        script: |
+          cat > /tmp/export_options.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+
+    artifacts:
+      - $CM_BUILD_DIR/output/*.ipa
+      - $CM_BUILD_DIR/HeartLink.xcarchive
+
+    publishing:
+      # Sends an install link to your email when the build succeeds
+      email:
+        recipients:
+          - your-email@example.com   # 👈 Replace with your email
+        notify:
+          success: true
+          failure: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. APP STORE / TESTFLIGHT — publish for TestFlight beta testing
+  #    Requires App Store Connect API Key set up in Codemagic dashboard
+  # ─────────────────────────────────────────────────────────────────────────────
+  ios-testflight:
+    name: iOS TestFlight Distribution
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "release-*"
+          include: true
+
+    environment:
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.yourname.heartlink
+      vars:
+        BUNDLE_ID: com.yourname.heartlink
+        BUNDLE_ID_WIDGET: com.yourname.heartlink.HeartLinkWidget
+        XCODE_PROJECT: ios/HeartLink.xcodeproj
+        XCODE_SCHEME: HeartLink
+        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)   # 👈 Add in Codemagic dashboard
+        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)
+        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)
+
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+
+      - name: Generate Xcode project
+        script: |
+          cd ios
+          xcodegen generate --spec project.yml
+
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID_WIDGET" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Bump build number
+        script: |
+          BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID")
+          agvtool new-version -all $((BUILD_NUMBER + 1))
+
+      - name: Build and archive for App Store
+        script: |
+          cd ios
+          xcodebuild \
+            -project HeartLink.xcodeproj \
+            -scheme HeartLink \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$CM_BUILD_DIR/HeartLink.xcarchive" \
+            archive \
+            | xcpretty --color
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$CM_BUILD_DIR/HeartLink.xcarchive" \
+            -exportOptionsPlist /tmp/export_options_appstore.plist \
+            -exportPath "$CM_BUILD_DIR/output" \
+            | xcpretty --color
+
+      - name: Generate App Store export options
+        script: |
+          cat > /tmp/export_options_appstore.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+    artifacts:
+      - $CM_BUILD_DIR/output/*.ipa
+      - $CM_BUILD_DIR/HeartLink.xcarchive
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+      email:
+        recipients:
+          - your-email@example.com   # 👈 Replace with your email
+        notify:
+          success: true
+          failure: true
